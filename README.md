@@ -7,7 +7,8 @@
 - RQ3 - Leon
 - PPT - Christopher
 - Review - George
-
+- Deadline 21st June
+- Presentation has a later deadline
 
 This project is going to research the affect of physical activity on mental fog experienced during the day among students.
 - Research Question 1 (RQ1):
