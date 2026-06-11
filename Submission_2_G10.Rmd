@@ -1,0 +1,388 @@
+---
+title: "Data Acquisition and Survey Methods"
+author: "Group 10"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_notebook:
+    toc: true
+    toc_depth: 3
+---
+
+# Exercise habits and their impact on students' focus
+
+Group 10 investigates whether students' physical exercise habits are related to their reported level of mental brain fog during lectures. The original proposal referred to exercise frequency and academic confidence. In the final survey data, the available Group 10 variables are exercise minutes, preferred exercise type, and brain fog; therefore, the analysis below focuses on these measured variables.
+
+## Table of contents
+
+1.  [Load data](#load-data)
+2.  [Survey questions and variables](#survey-questions-and-variables)
+3.  [Research questions and hypotheses](#research-questions-and-hypotheses)
+4.  [Exploratory data analysis](#exploratory-data-analysis)
+5.  [Descriptive inference](#descriptive-inference)
+6.  [Analytic inference](#analytic-inference)
+7.  [Functions used](#functions-used)
+8.  [Conclusion](#conclusion)
+
+## Load data {#load-data}
+
+```{r libraries, warning=FALSE, message = FALSE}
+library(tidyverse)
+library(kableExtra)
+```
+
+```{r load data}
+# Full dataset
+total_survey <- read_csv("Survey_results_2026.csv", show_col_types = FALSE)
+
+# Only Group 10 data
+survey <- total_survey %>%
+  select(
+    starts_with("DQ"),
+    starts_with("G10")
+  )
+
+# Remove strings
+names(survey) <- names(survey) %>%
+  str_remove("^DQ\\s*") %>%
+  str_remove("^G10\\s*")
+
+# Rename columns
+survey <- survey %>%
+  rename(
+    age = 1,
+    gender = 2,
+    academic_program = 3,
+    exercise_minutes = 4,
+    exercise_type = 5,
+    brain_fog = 6
+  )
+
+# Factorize
+survey <- survey %>%
+  mutate(
+    age = factor(age, levels = c("18-20", "21-23", "23-25", "25-30", "30-35", "over 35"), ordered = TRUE),
+    exercise_type = as.factor(exercise_type),
+    gender = as.factor(gender),
+    academic_program = as.factor(academic_program)
+  )
+
+```
+
+## Survey questions and variables {#survey-questions-and-variables}
+
+The analysis is based on the mandatory demographic questions and the three Group 10 survey questions.
+
+| Variable | Survey question | Type |
+|------------------------|------------------------|------------------------|
+| `age` | How old are you? | Quantitative |
+| `gender` | What is your gender? | Categorical |
+| `academic_program` | What is your academic program? | Categorical |
+| `exercise_minutes` | How many minutes of physical exercise did you complete in the last 7 days? | Quantitative |
+| `exercise_type` | What is your preferred type of exercise? | Categorical |
+| `brain_fog` | Rate your average level of mental brain fog during lectures on a scale of 1 = none to 5 = severe. | Ordinal / quantitative scale |
+
+## Research questions and hypotheses {#research-questions-and-hypotheses}
+
+**RQ1:** Do students who complete more minutes of physical exercise report lower levels of brain fog during lectures?\
+**Hypothesis:** Exercise minutes and brain fog are negatively associated.
+
+**RQ2:** Does reported brain fog differ by preferred type of exercise?\
+**Hypothesis:** Brain fog levels differ between exercise-type groups.
+
+**RQ3:** Is age negatively associated with the number of minutes spent on physical exercise per week?\
+**Hypothesis:** Older students report fewer exercise minutes.
+
+```{r analysis-objects, include=FALSE}
+rq1_data <- survey %>%
+  filter(!is.na(exercise_minutes), !is.na(brain_fog))
+
+rq2_data <- survey %>%
+  filter(!is.na(exercise_type), !is.na(brain_fog))
+
+rq3_data <- survey %>%
+  filter(!is.na(age), !is.na(exercise_minutes))
+
+rq1_test <- cor.test(
+  rq1_data$exercise_minutes,
+  rq1_data$brain_fog,
+  method = "spearman",
+  alternative = "less",
+  exact = FALSE
+)
+
+rq2_test <- kruskal.test(brain_fog ~ exercise_type, data = rq2_data)
+
+rq3_test <- kruskal.test(exercise_minutes ~ age, data = rq3_data)
+
+p_text <- function(p) {
+  ifelse(p < 0.001, "< 0.001", sprintf("%.3f", p))
+}
+
+brain_fog_cols <- c(
+  "1" = "#1a9850",
+  "2" = "#91cf60",
+  "3" = "#fee08b",
+  "4" = "#fc8d59",
+  "5" = "#d73027"
+)
+
+rq2_summary <- rq2_data %>%
+  group_by(exercise_type) %>%
+  summarise(
+    n = n(),
+    mean_brain_fog = mean(brain_fog, na.rm = TRUE),
+    median_brain_fog = median(brain_fog, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+lowest_fog_type <- rq2_summary$exercise_type[which.min(rq2_summary$mean_brain_fog)]
+highest_fog_type <- rq2_summary$exercise_type[which.max(rq2_summary$mean_brain_fog)]
+```
+
+## Exploratory data analysis {#exploratory-data-analysis}
+
+The exploratory analysis uses one visualization for each research question. The plots include both quantitative and categorical variables and help identify patterns before formal hypothesis testing.
+
+### RQ1: Exercise minutes and brain fog
+
+A boxplot with jittered points is used because brain fog is measured on a 1--5 scale and exercise minutes is quantitative. The color scale is green for low brain fog and red for severe brain fog.
+
+```{r rq1-plot, fig.width=7, fig.height=5}
+ggplot(survey, aes(x = factor(brain_fog), y = exercise_minutes, fill = factor(brain_fog))) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(aes(color = factor(brain_fog)), width = 0.15, alpha = 0.5, size = 1.8) +
+  scale_fill_manual(values = brain_fog_cols, name = "Brain fog") +
+  scale_color_manual(values = brain_fog_cols, guide = "none") +
+  labs(
+    title = "Exercise minutes by brain fog level",
+    x = "Brain fog level, 1 = none, 5 = severe",
+    y = "Minutes of exercise in the last 7 days"
+  ) +
+  theme_minimal()
+```
+
+**Finding:** The plot shows how weekly exercise minutes are distributed across the five brain-fog levels. If students with lower brain fog have higher median exercise minutes, this supports the idea that exercise may be connected to better focus during lectures. The formal Spearman test in the analytic inference section checks this pattern statistically.
+
+### RQ2: Brain fog by preferred exercise type
+
+A boxplot is appropriate because the explanatory variable is categorical and the outcome variable is measured on a 1--5 scale.
+
+```{r rq2-plot, fig.width=7, fig.height=5}
+ggplot(survey, aes(
+  x = reorder(exercise_type, brain_fog, median, na.rm = TRUE),
+  y = brain_fog,
+  color = factor(brain_fog)
+)) +
+  geom_boxplot(color = "black", outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.7, size = 1.8) +
+  coord_flip() +
+  scale_y_continuous(breaks = 1:5) +
+  scale_color_manual(
+    values = c(
+      "1" = "#1a9850",  # dark green: no brain fog
+      "2" = "#91cf60",  # light green
+      "3" = "#fee08b",  # yellow
+      "4" = "#fc8d59",  # orange
+      "5" = "#d73027"   # red: severe brain fog
+    ),
+    name = "Brain fog"
+  ) +
+  labs(
+    title = "Brain fog by preferred exercise type",
+    x = "Preferred type of exercise",
+    y = "Brain fog level, 1 = none, 5 = severe"
+  ) +
+  theme_minimal()
+```
+
+**Finding:** The lowest average brain fog is observed for `r lowest_fog_type`, while the highest average brain fog is observed for `r highest_fog_type`. This comparison is descriptive and does not by itself prove that the type of exercise causes differences in brain fog.
+
+### RQ3: Age and exercise minutes
+
+A scatterplot is used because both age and exercise minutes are quantitative variables. A trend line is added to show the general direction of the relationship.
+
+```{r rq3-plot, fig.width=7, fig.height=5}
+ggplot(survey, aes(x = age, y = exercise_minutes)) +
+  geom_boxplot() +
+  labs(
+    title = "Exercise minutes by age group",
+    x = "Age group",
+    y = "Minutes of exercise in the last 7 days"
+  ) +
+  theme_minimal()
+```
+
+**Finding:** The plot is used to assess whether older students tend to report fewer exercise minutes. The formal Spearman test below evaluates this negative-association hypothesis.
+
+## Descriptive inference {#descriptive-inference}
+
+The following table summarizes the quantitative variables using sample size, mean, standard deviation, median, minimum, and maximum. The median is useful because exercise minutes may be right-skewed if some students report very high exercise times.
+
+```{r descriptive-numeric-table}
+# One combined descriptive summary table
+
+numeric_vars <- survey %>%
+  select(exercise_minutes, brain_fog)
+
+numeric_summary <- data.frame(
+  Variable = c("Exercise minutes", "Brain fog"),
+  Type = "Quantitative",
+  Category = "",
+  N = as.character(sapply(numeric_vars, function(x) sum(!is.na(x)))),
+  Percent = "",
+  Mean = as.character(round(sapply(numeric_vars, function(x) mean(x, na.rm = TRUE)), 2)),
+  SD = as.character(round(sapply(numeric_vars, function(x) sd(x, na.rm = TRUE)), 2)),
+  Median = as.character(round(sapply(numeric_vars, function(x) median(x, na.rm = TRUE)), 2)),
+  Min = as.character(round(sapply(numeric_vars, function(x) min(x, na.rm = TRUE)), 2)),
+  Max = as.character(round(sapply(numeric_vars, function(x) max(x, na.rm = TRUE)), 2))
+)
+
+categorical_table <- function(data, variable, label) {
+  data %>%
+    filter(!is.na(.data[[variable]])) %>%
+    count(.data[[variable]], name = "N") %>%
+    mutate(
+      Variable = label,
+      Type = "Categorical",
+      Category = as.character(.data[[variable]]),
+      Percent = paste0(round(100 * N / sum(N), 1), "%"),
+      Mean = "",
+      SD = "",
+      Median = "",
+      Min = "",
+      Max = "",
+      N = as.character(N)
+    ) %>%
+    select(Variable, Type, Category, N, Percent, Mean, SD, Median, Min, Max)
+}
+
+categorical_summary <- bind_rows(
+  categorical_table(survey, "age", "Age group"),
+  categorical_table(survey, "gender", "Gender"),
+  categorical_table(survey, "academic_program", "Academic program"),
+  categorical_table(survey, "exercise_type", "Preferred exercise type")
+)
+
+summary_table <- bind_rows(
+  numeric_summary,
+  categorical_summary
+)
+
+summary_table %>%
+  knitr::kable(
+    caption = "Descriptive summary statistics for Group 10 variables",
+    booktabs = TRUE,
+    align = "lllrrrrrrr"
+  ) %>%
+  kableExtra::kable_styling(
+    latex_options = c("striped", "hold_position", "scale_down"),
+    full_width = FALSE
+  )
+```
+
+The next table summarizes the main categorical variable, preferred type of exercise.
+
+```{r descriptive-categorical-table}
+exercise_type_summary <- survey %>%
+  filter(!is.na(exercise_type)) %>%
+  count(exercise_type, name = "n") %>%
+  mutate(percent = round(100 * n / sum(n), 1)) %>%
+  arrange(desc(n))
+
+exercise_type_summary
+```
+
+## Analytic inference {#analytic-inference}
+
+Because brain fog is measured on an ordinal 1--5 scale and exercise minutes may not be normally distributed, Spearman's rank correlation is suitable for RQ1 and RQ3. It tests whether two variables have a monotonic relationship. For RQ2, the Kruskal-Wallis test is used because it compares brain fog across multiple exercise-type groups without assuming normality.
+
+```{r analytic-table}
+test_results <- data.frame(
+  Research_question = c("RQ1", "RQ2", "RQ3"),
+  Test = c(
+    "Spearman correlation",
+    "Kruskal-Wallis rank-sum test",
+    "Kruskal-Wallis rank-sum test"
+  ),
+  Hypothesis = c(
+    "More exercise minutes are associated with lower brain fog",
+    "Brain fog differs by preferred exercise type",
+    "Exercise minutes differ by age group"
+  ),
+  Estimate = c(
+    round(unname(rq1_test$estimate), 3),
+    NA,
+    NA
+  ),
+  Statistic = c(
+    round(unname(rq1_test$statistic), 2),
+    round(unname(rq2_test$statistic), 2),
+    round(unname(rq3_test$statistic), 2)
+  ),
+  P_value = c(
+    p_text(rq1_test$p.value),
+    p_text(rq2_test$p.value),
+    p_text(rq3_test$p.value)
+  ),
+  Decision_5_percent = c(
+    ifelse(rq1_test$p.value < 0.05, "Reject H0", "Do not reject H0"),
+    ifelse(rq2_test$p.value < 0.05, "Reject H0", "Do not reject H0"),
+    ifelse(rq3_test$p.value < 0.05, "Reject H0", "Do not reject H0")
+  )
+)
+
+
+test_results %>%
+  rename(
+    RQ = Research_question
+  ) %>%
+  mutate(
+    Hypothesis = kableExtra::linebreak(Hypothesis, align = "l")
+  ) %>%
+  knitr::kable(
+    caption = "Analytic inference results",
+    booktabs = TRUE,
+    escape = FALSE,
+    align = "lllrrll"
+  ) %>%
+  kableExtra::kable_styling(
+    latex_options = c("striped", "hold_position"),
+    full_width = FALSE
+  ) %>%
+  kableExtra::column_spec(1, width = "1cm") %>%
+  kableExtra::column_spec(2, width = "3cm") %>%
+  kableExtra::column_spec(3, width = "3cm")
+```
+
+### Interpretation of analytic results
+
+For **RQ1**, the Spearman correlation between exercise minutes and brain fog is `r round(unname(rq1_test$estimate), 3)` with a p-value of `r p_text(rq1_test$p.value)`. At the 5% significance level, we `r ifelse(rq1_test$p.value < 0.05, "reject the null hypothesis and find evidence that students who exercise more tend to report lower brain fog", "do not reject the null hypothesis, so the data do not provide strong evidence that more exercise is associated with lower brain fog")`.
+
+For **RQ2**, the Kruskal-Wallis test has a p-value of `r p_text(rq2_test$p.value)`. At the 5% significance level, we `r ifelse(rq2_test$p.value < 0.05, "reject the null hypothesis and conclude that brain fog differs between at least some preferred exercise types", "do not reject the null hypothesis, so the data do not provide strong evidence that brain fog differs by preferred exercise type")`.
+
+For **RQ3**, the Kruskal-Wallis test has a p-value of r p_text(rq3_test$p.value). At the 5% significance level, we r ifelse(rq3_test$p.value \< 0.05, "reject the null hypothesis and conclude that weekly exercise minutes differ between at least some age groups", "do not reject the null hypothesis, so the data do not provide strong evidence that weekly exercise minutes differ between age groups").
+
+## Functions used {#functions-used}
+
+| Function | Purpose in this report |
+|------------------------------------|------------------------------------|
+| `read_csv()` | Loads the CSV survey file. |
+| `select()` and `starts_with()` | Extract the demographic and Group 10 variables. |
+| `str_remove()` | Removes the prefixes `DQ` and `G10` from column names. |
+| `rename()` | Gives the selected columns shorter names. |
+| `mutate()` | Converts variables and creates analysis-ready values. |
+| `filter()` | Removes missing values before plots, summaries, and tests. |
+| `ggplot()` | Creates all visualizations. |
+| `geom_boxplot()`, `geom_jitter()`, `geom_point()`, `geom_smooth()` | Show distributions, individual observations, scatterplots, and trend lines. |
+| `count()` and `summarise()` | Compute categorical frequencies and summary statistics. |
+| `cor.test()` | Performs Spearman correlation tests for RQ1 and RQ3. |
+| `kruskal.test()` | Tests whether brain fog differs across exercise-type groups for RQ2. |
+| `knitr::kable()` | Displays results in readable tables. |
+
+## Conclusion {#conclusion}
+
+This report explored the relationship between physical exercise habits and mental brain fog among students. The descriptive analysis summarizes how much students exercise, which exercise types they prefer, and how strongly they report brain fog during lectures. The exploratory plots show the observed patterns visually, while the analytic tests evaluate whether these patterns are statistically supported.
+
+Overall, the findings should be interpreted as associations rather than causal effects. The survey is observational, so it cannot prove that exercise directly causes changes in brain fog. However, the results provide useful evidence about whether students with different exercise habits also report different levels of focus-related difficulty during lectures.

@@ -47,3 +47,8 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Raw survey data - keep private
+Survey_results_2026.csv
+*.csv
+
