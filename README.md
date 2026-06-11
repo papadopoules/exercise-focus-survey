@@ -1,5 +1,13 @@
 # exercise-focus-survey
 
+## Who did what
+RQ1 - Despoina
+RQ2 - Peter
+RQ3 - Leon
+PPT - Christopher
+Review - George
+
+
 This project is going to research the affect of physical activity on mental fog experienced during the day among students.
 - Research Question 1 (RQ1):
  Students who exercise at least 3 times a week report higher levels of daily concentration. 
