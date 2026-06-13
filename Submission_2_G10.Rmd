@@ -12,7 +12,7 @@ output:
 
 # Exercise habits and their impact on students' focus
 
-Group 10 investigates whether students' physical exercise habits are related to their reported level of mental brain fog during lectures. The original proposal referred to exercise frequency and academic confidence. In the final survey data, the available Group 10 variables are exercise minutes, preferred exercise type, and brain fog; therefore, the analysis below focuses on these measured variables.
+Group 10 investigates whether students' physical exercise habits are related to their reported level of mental brain fog during lectures. The original proposal referred to exercise frequency and academic confidence. In the final survey data, the available Group 10 variables are exercise minutes, preferred exercise type, and brain fog. Therefore, the analysis below focuses on these measured variables.
 
 ## Table of contents
 
@@ -75,7 +75,7 @@ survey <- survey %>%
 The analysis is based on the mandatory demographic questions and the three Group 10 survey questions.
 
 | Variable | Survey question | Type |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `age` | How old are you? | Quantitative |
 | `gender` | What is your gender? | Categorical |
 | `academic_program` | What is your academic program? | Categorical |
@@ -147,7 +147,11 @@ The exploratory analysis uses one visualization for each research question. The 
 
 ### RQ1: Exercise minutes and brain fog
 
-A boxplot with jittered points is used because brain fog is measured on a 1--5 scale and exercise minutes is quantitative. The color scale is green for low brain fog and red for severe brain fog.
+We built a layered data visualization using the `ggplot2` package to analyze how weekly exercise minutes vary across different levels of brain fog. We started by initializing the plot with the `ggplot` function, mapping the `survey` dataset. Inside the global aesthetics, we converted the `brain_fog` variable into a discrete factor so R would treat it as a categorical x-axis with five distinct groups, placed `exercise_minutes` on the continuous y-axis, and set the box colors to change dynamically based on the brain fog level.
+
+To visualize the distribution, we overlaid two distinct geometric layers. The first layer uses `geom_boxplot` to construct the standard boxplots showing the median, quartiles, and whiskers for each category. We set the transparency to 0.7 and explicitly hid the default outliers using `outlier.shape = NA` because we planned to show all raw data points instead. Directly on top of this, we added a `geom_jitter` layer to plot every individual response as a dot. By setting a jitter width of 0.15, we spread the dots out slightly horizontally so they wouldn't stack invisibly on top of each other, and a 0.5 transparency allowed us to see data density through overlapping points.
+
+Finally, we customized the appearance and context of the chart. We applied a custom color palette using `scale_fill_manual` to dye the boxes and named the legend "Brain fog", while using `scale_color_manual` with the guide set to none to ensure the jittered dots matched the box colors without spawning a redundant second legend. We then used the `labs` function to give the plot a clear title and explicitly define our axes, ensuring the reader knows the y-axis tracks the last seven days of exercise and the x-axis spans from none to severe. The entire visual is wrapped in `theme_minimal()`, which strips away the default heavy grey grid lines to give the final plot a clean, professional aesthetic. The color scale is green for low brain fog and red for severe brain fog.
 
 ```{r rq1-plot, fig.width=7, fig.height=5}
 ggplot(survey, aes(x = factor(brain_fog), y = exercise_minutes, fill = factor(brain_fog))) +
@@ -163,7 +167,15 @@ ggplot(survey, aes(x = factor(brain_fog), y = exercise_minutes, fill = factor(br
   theme_minimal()
 ```
 
-**Finding:** The plot shows how weekly exercise minutes are distributed across the five brain-fog levels. If students with lower brain fog have higher median exercise minutes, this supports the idea that exercise may be connected to better focus during lectures. The formal Spearman test in the analytic inference section checks this pattern statistically.
+**Finding:**
+
+To investigate our research question, we visualized the relationship between weekly physical activity and academic performance by plotting the quantitative variable of weekly exercise minutes against the ordinal categorical variable of reported brain fog levels using a combined boxplot and jittered scatter plot. Our initial hypothesis stated that exercise minutes and brain fog are negatively associated, meaning that higher levels of physical activity would correspond to lower levels of cognitive fatigue.
+
+The empirical data, however, reveals a more nuanced, non linear relationship rather than a strict, steady downward trend. The central tendencies, indicated by the median lines, actually peak at a mild brain fog level of 2 (around 200 minutes) and show only a gradual decline through levels 3 and 4, while students reporting zero brain fog at level 1 display a surprisingly low median of approximately 100 minutes. Furthermore, the high variability and vertical spread within levels 1 through 3 including several highly active outliers in level 3 exercising up to 1,000 minutes demonstrate that moderate brain fog is common across a wide range of activity levels.
+
+Nevertheless, our hypothesis holds true at the ultimate extreme of the spectrum. The distribution for level 5 is highly compressed and strictly bounded, showing that students experiencing severe brain fog almost never exceed 200 minutes of weekly exercise, while those who exercise intensely (beyond 400 minutes) rarely report severe cognitive symptoms.
+
+The hypothesis fails as a linear rule because high exercise does not automatically guarantee a clear mind.
 
 ### RQ2: Brain fog by preferred exercise type
 
@@ -336,7 +348,10 @@ test_results <- data.frame(
 
 test_results %>%
   rename(
-    RQ = Research_question
+    RQ = Research_question,
+    `P value` = P_value,
+    `Decision 5 percent` = Decision_5_percent
+    
   ) %>%
   mutate(
     Hypothesis = kableExtra::linebreak(Hypothesis, align = "l")
@@ -358,7 +373,13 @@ test_results %>%
 
 ### Interpretation of analytic results
 
-For **RQ1**, the Spearman correlation between exercise minutes and brain fog is `r round(unname(rq1_test$estimate), 3)` with a p-value of `r p_text(rq1_test$p.value)`. At the 5% significance level, we `r ifelse(rq1_test$p.value < 0.05, "reject the null hypothesis and find evidence that students who exercise more tend to report lower brain fog", "do not reject the null hypothesis, so the data do not provide strong evidence that more exercise is associated with lower brain fog")`.
+For **RQ1**: To address our first research question, we performed a Spearman rank correlation test to evaluate the relationship between weekly physical exercise and reported brain fog levels during lectures. This non-parametric test is given that our independent variable is an ordinal scale from 1 to 5, which violates the normality assumptions required for standard linear models.
+
+The test yielded a Spearman correlation coefficient estimate of $-0.113$, indicating a very weak negative relationship between the two variables. The resulting p-value was calculated to be 0.051. Because this p-value is slightly above our strict 5% significance threshold ($\alpha = 0.05$), we do not reject the null hypothesis ($H_0$), which states that there is no monotonic association between exercise minutes and brain fog.
+
+The statistical test confirms that we cannot definitively claim a general trend of lower brain fog for students who exercise more across the entire dataset. While our visualization hinted at a protective threshold at the extreme ends, specifically that severe brain fog is isolated to lower exercise levels, the weak correlation coefficient and the borderline non significant p-value demonstrate that this pattern is not strong or consistent enough across the central categories to be statistically reliable.
+
+Ultimately, these findings suggest that while high levels of physical activity may limit severe cognitive fatigue for some, minor fluctuations in weekly exercise minutes do not systematically predict lower levels of day to day brain fog for the broader student body.
 
 For **RQ2**, the Kruskal-Wallis test has a p-value of `r p_text(rq2_test$p.value)`. At the 5% significance level, we `r ifelse(rq2_test$p.value < 0.05, "reject the null hypothesis and conclude that brain fog differs between at least some preferred exercise types", "do not reject the null hypothesis, so the data do not provide strong evidence that brain fog differs by preferred exercise type")`.
 
@@ -367,7 +388,7 @@ For **RQ3**, the Kruskal-Wallis test has a p-value of r p_text(rq3_test$p.value)
 ## Functions used {#functions-used}
 
 | Function | Purpose in this report |
-|------------------------------------|------------------------------------|
+|----|----|
 | `read_csv()` | Loads the CSV survey file. |
 | `select()` and `starts_with()` | Extract the demographic and Group 10 variables. |
 | `str_remove()` | Removes the prefixes `DQ` and `G10` from column names. |
