@@ -59,13 +59,19 @@ survey <- survey %>%
     brain_fog = 6
   )
 
-# Factorize
+# Factorize and create new variables
 survey <- survey %>%
   mutate(
     age = factor(age, levels = c("18-20", "21-23", "23-25", "25-30", "30-35", "over 35"), ordered = TRUE),
     exercise_type = as.factor(exercise_type),
     gender = as.factor(gender),
-    academic_program = as.factor(academic_program)
+    academic_program = as.factor(academic_program),
+    intensity_level = case_when(
+      exercise_type %in% c("Weightlifting", "Cardio", "Team Sports") ~ "High-intensity",
+      exercise_type == "Yoga/Flexibility" ~ "Low-intensity",
+      TRUE ~ NA_character_
+    ),
+    intensity_level = factor(intensity_level, levels = c("Low-intensity", "High-intensity"))
   )
 
 ```
@@ -75,7 +81,7 @@ survey <- survey %>%
 The analysis is based on the mandatory demographic questions and the three Group 10 survey questions.
 
 | Variable | Survey question | Type |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | `age` | How old are you? | Quantitative |
 | `gender` | What is your gender? | Categorical |
 | `academic_program` | What is your academic program? | Categorical |
@@ -88,8 +94,8 @@ The analysis is based on the mandatory demographic questions and the three Group
 **RQ1:** Do students who complete more minutes of physical exercise report lower levels of brain fog during lectures?\
 **Hypothesis:** Exercise minutes and brain fog are negatively associated.
 
-**RQ2:** Does reported brain fog differ by preferred type of exercise?\
-**Hypothesis:** Brain fog levels differ between exercise-type groups.
+**RQ2:** Does high-intensity training (e.g., gym, running) correlate with higher academic confidence compared to low-intensity (e.g., walking)?\
+**Hypothesis:** Students preferring high-intensity training report lower brain fog (as a proxy for higher academic confidence) than those preferring low-intensity training.
 
 **RQ3:** Is age negatively associated with the number of minutes spent on physical exercise per week?\
 **Hypothesis:** Older students report fewer exercise minutes.
@@ -99,7 +105,7 @@ rq1_data <- survey %>%
   filter(!is.na(exercise_minutes), !is.na(brain_fog))
 
 rq2_data <- survey %>%
-  filter(!is.na(exercise_type), !is.na(brain_fog))
+  filter(!is.na(intensity_level), !is.na(brain_fog))
 
 rq3_data <- survey %>%
   filter(!is.na(age), !is.na(exercise_minutes))
@@ -112,7 +118,7 @@ rq1_test <- cor.test(
   exact = FALSE
 )
 
-rq2_test <- kruskal.test(brain_fog ~ exercise_type, data = rq2_data)
+rq2_test <- wilcox.test(brain_fog ~ intensity_level, data = rq2_data, exact = FALSE)
 
 rq3_test <- kruskal.test(exercise_minutes ~ age, data = rq3_data)
 
@@ -129,7 +135,7 @@ brain_fog_cols <- c(
 )
 
 rq2_summary <- rq2_data %>%
-  group_by(exercise_type) %>%
+  group_by(intensity_level) %>%
   summarise(
     n = n(),
     mean_brain_fog = mean(brain_fog, na.rm = TRUE),
@@ -137,8 +143,8 @@ rq2_summary <- rq2_data %>%
     .groups = "drop"
   )
 
-lowest_fog_type <- rq2_summary$exercise_type[which.min(rq2_summary$mean_brain_fog)]
-highest_fog_type <- rq2_summary$exercise_type[which.max(rq2_summary$mean_brain_fog)]
+lowest_fog_type <- rq2_summary$intensity_level[which.min(rq2_summary$mean_brain_fog)]
+highest_fog_type <- rq2_summary$intensity_level[which.max(rq2_summary$mean_brain_fog)]
 ```
 
 ## Exploratory data analysis {#exploratory-data-analysis}
@@ -177,13 +183,13 @@ Nevertheless, our hypothesis holds true at the ultimate extreme of the spectrum.
 
 The hypothesis fails as a linear rule because high exercise does not automatically guarantee a clear mind.
 
-### RQ2: Brain fog by preferred exercise type
+### RQ2: Brain fog by exercise intensity
 
-A boxplot is appropriate because the explanatory variable is categorical and the outcome variable is measured on a 1--5 scale.
+A boxplot is appropriate because the explanatory variable is categorical and the outcome variable is measured on a 1-5 scale. We grouped the exercise types into two intensity levels: High-intensity (Cardio, Weightlifting, Team Sports) and Low-intensity (Yoga/Flexibility).
 
 ```{r rq2-plot, fig.width=7, fig.height=5}
-ggplot(survey, aes(
-  x = reorder(exercise_type, brain_fog, median, na.rm = TRUE),
+ggplot(survey[!is.na(survey$intensity_level), ], aes(
+  x = intensity_level,
   y = brain_fog,
   color = factor(brain_fog)
 )) +
@@ -202,14 +208,14 @@ ggplot(survey, aes(
     name = "Brain fog"
   ) +
   labs(
-    title = "Brain fog by preferred exercise type",
-    x = "Preferred type of exercise",
+    title = "Brain fog by exercise intensity",
+    x = "Exercise intensity level",
     y = "Brain fog level, 1 = none, 5 = severe"
   ) +
   theme_minimal()
 ```
 
-**Finding:** The lowest average brain fog is observed for `r lowest_fog_type`, while the highest average brain fog is observed for `r highest_fog_type`. This comparison is descriptive and does not by itself prove that the type of exercise causes differences in brain fog.
+**Finding:** The visualization reveals that the median brain fog level is identical (level 3) for both high-intensity and low-intensity exercise groups. However, the high-intensity group has a tighter and lower interquartile range (spanning levels 2 to 3) compared to the low-intensity group (which spans levels 2 to 4). This indicates that while the medians are the same, high-intensity exercise is descriptively associated with a slightly lower overall distribution of brain fog.
 
 ### RQ3: Age and exercise minutes
 
@@ -274,7 +280,8 @@ categorical_summary <- bind_rows(
   categorical_table(survey, "age", "Age group"),
   categorical_table(survey, "gender", "Gender"),
   categorical_table(survey, "academic_program", "Academic program"),
-  categorical_table(survey, "exercise_type", "Preferred exercise type")
+  categorical_table(survey, "exercise_type", "Preferred exercise type"),
+  categorical_table(survey, "intensity_level", "Exercise intensity")
 )
 
 summary_table <- bind_rows(
@@ -308,19 +315,19 @@ exercise_type_summary
 
 ## Analytic inference {#analytic-inference}
 
-Because brain fog is measured on an ordinal 1--5 scale and exercise minutes may not be normally distributed, Spearman's rank correlation is suitable for RQ1 and RQ3. It tests whether two variables have a monotonic relationship. For RQ2, the Kruskal-Wallis test is used because it compares brain fog across multiple exercise-type groups without assuming normality.
+Because brain fog is measured on an ordinal 1-5 scale and exercise minutes may not be normally distributed, Spearman's rank correlation is suitable for RQ1 and RQ3. It tests whether two variables have a monotonic relationship. For RQ2, the Wilcoxon rank-sum test (Mann-Whitney U test) is used because it compares the ordinal brain fog variable between two independent intensity-level groups without assuming normality.
 
 ```{r analytic-table}
 test_results <- data.frame(
   Research_question = c("RQ1", "RQ2", "RQ3"),
   Test = c(
     "Spearman correlation",
-    "Kruskal-Wallis rank-sum test",
+    "Wilcoxon rank-sum test",
     "Kruskal-Wallis rank-sum test"
   ),
   Hypothesis = c(
     "More exercise minutes are associated with lower brain fog",
-    "Brain fog differs by preferred exercise type",
+    "High-intensity exercise correlates with lower brain fog",
     "Exercise minutes differ by age group"
   ),
   Estimate = c(
@@ -381,14 +388,20 @@ The statistical test confirms that we cannot definitively claim a general trend 
 
 Ultimately, these findings suggest that while high levels of physical activity may limit severe cognitive fatigue for some, minor fluctuations in weekly exercise minutes do not systematically predict lower levels of day to day brain fog for the broader student body.
 
-For **RQ2**, the Kruskal-Wallis test has a p-value of `r p_text(rq2_test$p.value)`. At the 5% significance level, we `r ifelse(rq2_test$p.value < 0.05, "reject the null hypothesis and conclude that brain fog differs between at least some preferred exercise types", "do not reject the null hypothesis, so the data do not provide strong evidence that brain fog differs by preferred exercise type")`.
+For **RQ2**: To evaluate whether high-intensity training correlates with higher academic confidence (measured by lower brain fog) compared to low-intensity training, we conducted a Wilcoxon rank-sum test (Mann-Whitney U test). This non-parametric test is appropriate because it compares the distribution of an ordinal variable (brain fog on a 1-5 scale) across two independent groups (High-intensity vs. Low-intensity).
+
+The statistical test yielded a p-value of $0.634$. Since this p-value is well above the standard 5% significance threshold ($\alpha = 0.05$), we fail to reject the null hypothesis. Statistically, there is no significant shift in the distribution of brain fog scores between students who prefer high-intensity workouts and those who prefer low-intensity workouts.
+
+These analytic results align closely with our visual exploratory findings. While the boxplot showed a slightly more concentrated cluster of responses for the high-intensity group, the median brain fog level was identical (level 3) across both intensity brackets. The Wilcoxon test confirms that the observed minor differences in variance are not statistically meaningful.
+
+Ultimately, we must reject the hypothesis that high-intensity training provides a superior benefit to academic confidence compared to low-intensity training.
 
 For **RQ3**, the Kruskal-Wallis test has a p-value of r p_text(rq3_test$p.value). At the 5% significance level, we r ifelse(rq3_test$p.value \< 0.05, "reject the null hypothesis and conclude that weekly exercise minutes differ between at least some age groups", "do not reject the null hypothesis, so the data do not provide strong evidence that weekly exercise minutes differ between age groups").
 
 ## Functions used {#functions-used}
 
 | Function | Purpose in this report |
-|----|----|
+|------------------------------------|------------------------------------|
 | `read_csv()` | Loads the CSV survey file. |
 | `select()` and `starts_with()` | Extract the demographic and Group 10 variables. |
 | `str_remove()` | Removes the prefixes `DQ` and `G10` from column names. |
