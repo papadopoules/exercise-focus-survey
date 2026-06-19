@@ -201,7 +201,7 @@ ggplot(survey[!is.na(survey$intensity_level), ], aes(
     values = c(
       "1" = "#1a9850",  # dark green: no brain fog
       "2" = "#91cf60",  # light green
-      "3" = "#fee08b",  # yellow
+      "3" = "#ffbf00",  # yellow
       "4" = "#fc8d59",  # orange
       "5" = "#d73027"   # red: severe brain fog
     ),
@@ -209,8 +209,9 @@ ggplot(survey[!is.na(survey$intensity_level), ], aes(
   ) +
   labs(
     title = "Brain fog by exercise intensity",
+    subtitle = "Brain fog level: 1 (None) to 5 (Severe)",
     x = "Exercise intensity level",
-    y = "Brain fog level, 1 = none, 5 = severe"
+    y = ""
   ) +
   theme_minimal()
 ```
