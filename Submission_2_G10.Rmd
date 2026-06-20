@@ -105,7 +105,8 @@ rq2_data <- survey %>%
   filter(!is.na(intensity_level), !is.na(brain_fog))
 
 rq3_data <- survey %>%
-  filter(!is.na(age), !is.na(exercise_minutes))
+  filter(!is.na(age), !is.na(exercise_minutes)) %>%
+  mutate(age_numeric = as.numeric(age))
 
 rq1_test <- cor.test(
   rq1_data$exercise_minutes,
@@ -117,7 +118,21 @@ rq1_test <- cor.test(
 
 rq2_test <- wilcox.test(brain_fog ~ intensity_level, data = rq2_data, exact = FALSE)
 
-rq3_test <- kruskal.test(exercise_minutes ~ age, data = rq3_data)
+rq3_test <- cor.test(
+  rq3_data$age_numeric,
+  rq3_data$exercise_minutes,
+  method = "spearman",
+  alternative = "less",
+  exact = FALSE
+)
+
+rq3_test_two <- cor.test(
+  rq3_data$age_numeric,
+  rq3_data$exercise_minutes,
+  method = "spearman",
+  alternative = "two.sided",
+  exact = FALSE
+)
 
 p_text <- function(p) {
   ifelse(p < 0.001, "< 0.001", sprintf("%.3f", p))
@@ -212,28 +227,31 @@ ggplot(survey[!is.na(survey$intensity_level), ], aes(
 
 ### RQ3: Age and exercise minutes
 
-A scatterplot is used because both age and exercise minutes are quantitative variables. A trend line is added to show the general direction of the relationship.
+A boxplot is appropriate here because age is an ordered categorical variable (six age bands) while exercise minutes is quantitative. 
+A line connecting the group medians makes the direction of the age trend visible before formal testing.
 
 ```{r rq3-plot, fig.width=7, fig.height=5}
-ggplot(survey, aes(x = age, y = exercise_minutes)) +
-  geom_boxplot() +
+ggplot(rq3_data, aes(x = age, y = exercise_minutes)) +
+  geom_boxplot(fill = "#91cf60", alpha = 0.3, outlier.shape = NA) +
+  geom_jitter(width = 0.18, alpha = 0.5, size = 1.4, color = "#1a9850") +
+  stat_summary(fun = median, geom = "line", aes(group = 1),
+               color = "#d73027", linewidth = 0.9) +
+  stat_summary(fun = median, geom = "point", color = "#d73027", size = 2.2) +
   labs(
     title = "Exercise minutes by age group",
+    subtitle = "Red line connects group medians (older bands to the right)",
     x = "Age group",
     y = "Minutes of exercise in the last 7 days"
   ) +
   theme_minimal()
 ```
 
-**Finding:** The plot is used to assess whether older students tend to report fewer exercise minutes. The formal Spearman test below evaluates this negative-association hypothesis.
+**Finding:** Median weekly exercise peaks in the early-twenties bands (21–23 $\approx$ 190 min, 23–25 $\approx$ 180 min) and then starts going downhill through the older groups. The 18–20 may be very low, but since it only contains 3 entries it shouldn't be taken too seriously. The red median line shows a general downward trend with age, alongside wide spread within every group.Because this is an ordered trend across age bands rather than arbitrary differences between unrelated groups, a Spearman rank correlation was chosen, rather than a group-comparison test such as Kruskal-Wallis.
 
 ## Descriptive inference {#descriptive-inference}
 
 The following table summarizes the quantitative variables using sample size, mean, standard deviation, median, minimum, and maximum. The median is useful because exercise minutes may be right-skewed if some students report very high exercise times.
-
 ```{r descriptive-numeric-table}
-# One combined descriptive summary table
-
 numeric_vars <- survey %>%
   select(exercise_minutes, brain_fog)
 
@@ -295,7 +313,6 @@ summary_table %>%
 ```
 
 The next table summarizes the main categorical variable, preferred type of exercise.
-
 ```{r descriptive-categorical-table}
 exercise_type_summary <- survey %>%
   filter(!is.na(exercise_type)) %>%
@@ -316,17 +333,17 @@ test_results <- data.frame(
   Test = c(
     "Spearman correlation",
     "Wilcoxon rank-sum test",
-    "Kruskal-Wallis rank-sum test"
+    "Spearman correlation"
   ),
   Hypothesis = c(
     "More exercise minutes are associated with lower brain fog",
     "High-intensity exercise correlates with lower brain fog",
-    "Exercise minutes differ by age group"
+    "Older students complete fewer exercise minutes"
   ),
   Estimate = c(
     round(unname(rq1_test$estimate), 3),
     NA,
-    NA
+    round(unname(rq3_test$estimate), 3)
   ),
   Statistic = c(
     round(unname(rq1_test$statistic), 2),
@@ -395,7 +412,16 @@ Ultimately, we must reject the hypothesis that high-intensity training provides 
 
 #### RQ3 result
 
-The Kruskal-Wallis test has a p-value of r p_text(rq3_test$p.value). At the 5% significance level, we r ifelse(rq3_test$p.value \< 0.05, "reject the null hypothesis and conclude that weekly exercise minutes differ between at least some age groups", "do not reject the null hypothesis, so the data do not provide strong evidence that weekly exercise minutes differ between age groups").
+To test whether older students report fewer weekly exercise minutes, we used a Spearman rank correlation. 
+This was chosen because age was collected in ordered bands and not continuous values. Also exercise minutes are right-skewed (mean $\approx$ 195, max = 1100).
+Also because the hypothesis is directional, we used a one-sided test.
+
+The test returned a coefficient of $\rho = `r round(unname(rq3_test$estimate), 3)`$, indicating a weak negative monotonic relationship between age and weekly exercise. The one-sided p-value was `r p_text(rq3_test$p.value)`. Because this is below the 5% threshold ($\alpha = 0.05$), we reject the null hypothesis and conclude that the data provide evidence that older students complete fewer minutes of weekly exercise. For transparency, the two-sided p-value is `r p_text(rq3_test_two$p.value)`, i.e. only marginally above 0.05; the one-sided test is justified by the directional hypothesis.
+
+This aligns with the exploratory boxplot, where median minutes drift downward across the older bands and fall most clearly at 30–35. We deliberately use Spearman rather than Kruskal-Wallis because Kruskal-Wallis ignores the ordering of the age bands and only detects group differences, and on this data it is not significant (p $\approx$ 0.28). The contrast shows the effect is a weak monotonic trend with age rather than a large gap between specific groups.
+
+Two things that we should mention are, that the association is weak ($|\rho| \approx 0.14$), so age explains only a small share of the variation in exercise minutes, and the extreme bands are sparse (18–20 has 3 respondents, over-35 has 8). 
+Because of this the findings should be treated as an observation and not as a causal effect.
 
 ## Functions used {#functions-used}
 
@@ -411,7 +437,7 @@ The Kruskal-Wallis test has a p-value of r p_text(rq3_test$p.value). At the 5% s
 | `geom_boxplot()`, `geom_jitter()`, `geom_point()`, `geom_smooth()` | Show distributions, individual observations, scatterplots, and trend lines. |
 | `count()` and `summarise()` | Compute categorical frequencies and summary statistics. |
 | `cor.test()` | Performs Spearman correlation tests for RQ1 and RQ3. |
-| `kruskal.test()` | Tests whether brain fog differs across exercise-type groups for RQ2. |
+| `wilcox.test()` | Wilcoxon rank-sum (Mann-Whitney U) test comparing brain fog between exercise-intensity groups for RQ2. |
 | `knitr::kable()` | Displays results in readable tables. |
 
 ## Conclusion {#conclusion}
