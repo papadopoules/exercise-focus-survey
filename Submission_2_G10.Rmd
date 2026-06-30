@@ -9,18 +9,7 @@ output:
 
 # Exercise habits and their impact on students' focus
 
-Group 10 investigates whether students' physical exercise habits are related to their reported level of mental brain fog during lectures. The original proposal referred to exercise frequency and academic confidence. In the final survey data, the available Group 10 variables are `exercise minutes`, `preferred exercise type` and `brain fog`. Therefore, the analysis below focuses on these measured variables.
-
-## Table of contents
-
-1.  [Load data](#load-data)
-2.  [Survey questions and variables](#survey-questions-and-variables)
-3.  [Research questions and hypotheses](#research-questions-and-hypotheses)
-4.  [Exploratory data analysis](#exploratory-data-analysis)
-5.  [Descriptive inference](#descriptive-inference)
-6.  [Analytic inference](#analytic-inference)
-7.  [Functions used](#functions-used)
-8.  [Conclusion](#conclusion)
+Group 10 investigates whether students' physical exercise habits are related to their reported level of mental brain fog during lectures. The original proposal referred to exercise frequency and brain fog In the final survey data, the available Group 10 variables are `exercise minutes`, `preferred exercise type` and `brain fog`. Therefore, the analysis below focuses on these measured variables.
 
 ## Load data {#load-data}
 
@@ -79,7 +68,7 @@ The analysis is based on the mandatory demographic questions and the three Group
 
 | Variable | Survey question | Type |
 |------------------------|------------------------|------------------------|
-| `age` | How old are you? | Quantitative |
+| `age` | How old are you? | Ordinal categorical |
 | `gender` | What is your gender? | Categorical |
 | `academic_program` | What is your academic program? | Categorical |
 | `exercise_minutes` | How many minutes of physical exercise did you complete in the last 7 days? | Quantitative |
@@ -91,8 +80,8 @@ The analysis is based on the mandatory demographic questions and the three Group
 **RQ1:** Do students who complete more minutes of physical exercise report lower levels of brain fog during lectures?\
 **Hypothesis:** Exercise minutes and brain fog are negatively associated.
 
-**RQ2:** Does high-intensity training (e.g., gym, running) correlate with higher academic confidence compared to low-intensity (e.g., walking)?\
-**Hypothesis:** Students preferring high-intensity training report lower brain fog (as a proxy for higher academic confidence) than those preferring low-intensity training.
+**RQ2:** Does high intensity training (e.g. weightlifting) relate to lower brain fog compared to low intensity training (e.g. yoga)?\
+**Hypothesis:** Students preferring high intensity training report lower brain fog than those preferring low intensity training.
 
 **RQ3:** Is age negatively associated with the number of minutes spent on physical exercise per week?\
 **Hypothesis:** Older students report fewer exercise minutes.
@@ -402,13 +391,13 @@ Ultimately, these findings suggest that while high levels of physical activity m
 
 #### RQ2 result
 
-To evaluate whether high-intensity training correlates with higher academic confidence (measured by lower brain fog) compared to low-intensity training, we conducted a Wilcoxon rank-sum test (Mann-Whitney U test). This non-parametric test is appropriate because it compares the distribution of an ordinal variable (brain fog on a 1-5 scale) across two independent groups (High-intensity vs. Low-intensity).
+To evaluate whether high-intensity training correlates with higher brain fog (measured by lower brain fog) compared to low-intensity training, we conducted a Wilcoxon rank-sum test (Mann-Whitney U test). This non-parametric test is appropriate because it compares the distribution of an ordinal variable (brain fog on a 1-5 scale) across two independent groups (High-intensity vs. Low-intensity).
 
 The statistical test yielded a p-value of $0.634$. Since this p-value is well above the standard 5% significance threshold ($\alpha = 0.05$), we fail to reject the null hypothesis. Statistically, there is no significant shift in the distribution of brain fog scores between students who prefer high-intensity workouts and those who prefer low-intensity workouts.
 
 These analytic results align closely with our visual exploratory findings. While the boxplot showed a slightly more concentrated cluster of responses for the high-intensity group, the median brain fog level was identical (level 3) across both intensity brackets. The Wilcoxon test confirms that the observed minor differences in variance are not statistically meaningful.
 
-Ultimately, we must reject the hypothesis that high-intensity training provides a superior benefit to academic confidence compared to low-intensity training.
+Ultimately, we must reject the hypothesis that high intensity training provides a superior benefit to brain fog compared to low intensity training.
 
 #### RQ3 result
 
